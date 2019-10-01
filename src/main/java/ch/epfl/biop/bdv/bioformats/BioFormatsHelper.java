@@ -149,18 +149,31 @@ public class BioFormatsHelper {
 
         AffineTransform3D rootTransform = new AffineTransform3D();
 
-        double[] p = getPos(omeMeta, iSerie, u);
-        double[] d = getVoxSize(omeMeta, iSerie, u);
+        double[] calibratedImagePosition = getPos(omeMeta, iSerie, u);
+        double[] voxelSpacings = getVoxSize(omeMeta, iSerie, u);
+        final Dimensions pixelDimensions = getDimensions( omeMeta, iSerie, u );
 
         // Sets AffineTransform of the highest resolution image from the pyramid
         rootTransform.identity();
         rootTransform.set(
-                d[0],0   ,0   ,0,
-                0   ,d[1],0   ,0,
-                0   ,0   ,d[2],0,
+                voxelSpacings[0],0   ,0   ,0,
+                0   ,voxelSpacings[1],0   ,0,
+                0   ,0   ,voxelSpacings[2],0,
                 0   ,0   ,0   ,1
         );
-        rootTransform.translate(p[0], p[1], p[2]);
+
+        // The image position p in Bioformats is the image centre position
+        // but for bdv we need the upper left corner
+        final double[] calibratedTranslation = new double[ 3 ];
+        final double[] calibratedImageHalfSpan = new double[ 3 ];
+
+        for ( int d = 0; d < 3; d++ )
+            calibratedImageHalfSpan[ d ] = ( pixelDimensions.dimension( d ) - 1 ) * voxelSpacings[ d ] / 2;
+
+        for ( int d = 0; d < 3; d++ )
+            calibratedTranslation[ d ] =  Math.abs( calibratedImagePosition[ d ] ) - calibratedImageHalfSpan[ d ];
+
+        rootTransform.translate( calibratedTranslation );
         return rootTransform;
     }
 
@@ -219,9 +232,7 @@ public class BioFormatsHelper {
 
         long[] dims = new long[3];
         dims[0] = sX;
-
         dims[1] = sY;
-
         dims[2] = sZ;
 
         Dimensions dimensions = new Dimensions() {
